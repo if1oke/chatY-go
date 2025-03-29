@@ -3,7 +3,9 @@ package server
 import (
 	"chatY-go/internal/api/tcp"
 	appSession "chatY-go/internal/application/session"
+	"chatY-go/internal/domain/message"
 	"chatY-go/internal/domain/session"
+	"chatY-go/internal/domain/user"
 	"chatY-go/pkg/utils"
 	"net"
 	"sync"
@@ -37,8 +39,8 @@ func (app *Application) AppConfig() utils.IConfig {
 func (app *Application) Session() session.ISession {
 	if app.session == nil {
 
-		broadcast := make(chan string)
-		clients := make(map[net.Conn]bool)
+		broadcast := make(chan message.IMessage)
+		clients := make(map[net.Conn]user.IUser)
 		mu := sync.Mutex{}
 
 		chatSession := appSession.NewChatSession(broadcast, clients, &mu)

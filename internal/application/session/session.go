@@ -2,21 +2,24 @@ package session
 
 import (
 	"bufio"
+	"chatY-go/internal/domain/message"
+	"chatY-go/internal/domain/user"
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"sync"
 )
 
 type ChatSession struct {
-	broadcast chan string
-	clients   map[net.Conn]bool
+	broadcast chan message.IMessage
+	clients   map[net.Conn]user.IUser
 	mu        *sync.Mutex
 }
 
 func NewChatSession(
-	broadcast chan string,
-	clients map[net.Conn]bool,
+	broadcast chan message.IMessage,
+	clients map[net.Conn]user.IUser,
 	mu *sync.Mutex,
 ) *ChatSession {
 	s := &ChatSession{
@@ -29,10 +32,10 @@ func NewChatSession(
 }
 
 func (s *ChatSession) Start(conn net.Conn) {
-	s.Register(conn)
+	s.register(conn)
 
 	defer func() {
-		s.Unregister(conn)
+		s.unregister(conn)
 		err := conn.Close()
 		if err != nil {
 			return
@@ -42,15 +45,20 @@ func (s *ChatSession) Start(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 
 	for {
-		msg, err := reader.ReadString('\n')
+		rawMessage, err := reader.ReadString('\n')
+
 		if err != nil {
 			log.Printf("Client disconnected: %v", err)
-			s.Unregister(conn)
+			s.unregister(conn)
 			return
 		}
-		log.Printf("Received: %s", msg)
 
-		s.Broadcast(msg)
+		msg := message.NewMessage(s.clients[conn], rawMessage)
+		log.Printf(msg.Print())
+
+		s.handleCommands(msg)
+
+		s.doBroadcast(msg)
 	}
 }
 
@@ -58,7 +66,7 @@ func (s *ChatSession) broadcaster() {
 	for {
 		msg := <-s.broadcast
 		for client := range s.clients {
-			_, err := fmt.Fprintf(client, msg)
+			_, err := fmt.Fprintf(client, msg.Print())
 			if err != nil {
 				log.Printf("write to client error: %s", err.Error())
 			}
@@ -66,18 +74,34 @@ func (s *ChatSession) broadcaster() {
 	}
 }
 
-func (s *ChatSession) Broadcast(message string) {
+func (s *ChatSession) handleCommands(message message.IMessage) {
+	msgArr := strings.Split(strings.Replace(message.Text(), "\n", "", 1), " ")
+	switch msgArr[0] {
+	case "/nick":
+		oldNickname := message.User().Nickname()
+		s.setNickname(message.User(), msgArr[1])
+		message.SetText(fmt.Sprintf("%s nickname changed to %s\n", oldNickname, msgArr[1]))
+	}
+}
+
+func (s *ChatSession) doBroadcast(message message.IMessage) {
 	s.broadcast <- message
 }
 
-func (s *ChatSession) Register(conn net.Conn) {
+func (s *ChatSession) register(conn net.Conn) {
 	s.mu.Lock()
-	s.clients[conn] = true
+	s.clients[conn] = user.NewUser(fmt.Sprintf("User_%s", conn.RemoteAddr()))
 	s.mu.Unlock()
 }
 
-func (s *ChatSession) Unregister(conn net.Conn) {
+func (s *ChatSession) unregister(conn net.Conn) {
 	s.mu.Lock()
 	delete(s.clients, conn)
+	s.mu.Unlock()
+}
+
+func (s *ChatSession) setNickname(user user.IUser, nickname string) {
+	s.mu.Lock()
+	user.SetNickname(nickname)
 	s.mu.Unlock()
 }
