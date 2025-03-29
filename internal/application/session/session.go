@@ -11,6 +11,12 @@ import (
 	"sync"
 )
 
+const (
+	COMMAND_NICKNAME = "/nick"
+	COMMAND_LIST     = "/list"
+	COMMAND_EXIT     = "/exit"
+)
+
 type ChatSession struct {
 	broadcast chan message.IMessage
 	clients   map[net.Conn]user.IUser
@@ -56,7 +62,7 @@ func (s *ChatSession) Start(conn net.Conn) {
 		msg := message.NewMessage(s.clients[conn], rawMessage)
 		log.Printf(msg.Print())
 
-		s.handleCommands(msg)
+		s.handleCommands(msg, conn)
 
 		s.doBroadcast(msg)
 	}
@@ -74,13 +80,16 @@ func (s *ChatSession) broadcaster() {
 	}
 }
 
-func (s *ChatSession) handleCommands(message message.IMessage) {
-	msgArr := strings.Split(strings.Replace(message.Text(), "\n", "", 1), " ")
-	switch msgArr[0] {
-	case "/nick":
-		oldNickname := message.User().Nickname()
-		s.setNickname(message.User(), msgArr[1])
-		message.SetText(fmt.Sprintf("%s nickname changed to %s\n", oldNickname, msgArr[1]))
+func (s *ChatSession) handleCommands(message message.IMessage, conn net.Conn) {
+	cmd, arg := parseCommand(message.Text())
+
+	switch cmd {
+	case COMMAND_NICKNAME:
+		s.handleNicknameCommand(message, arg)
+	case COMMAND_LIST:
+		s.handleListCommand(message)
+	case COMMAND_EXIT:
+		s.unregister(conn)
 	}
 }
 
@@ -90,18 +99,41 @@ func (s *ChatSession) doBroadcast(message message.IMessage) {
 
 func (s *ChatSession) register(conn net.Conn) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.clients[conn] = user.NewUser(fmt.Sprintf("User_%s", conn.RemoteAddr()))
-	s.mu.Unlock()
 }
 
 func (s *ChatSession) unregister(conn net.Conn) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	delete(s.clients, conn)
-	s.mu.Unlock()
+	conn.Close()
 }
 
-func (s *ChatSession) setNickname(user user.IUser, nickname string) {
+func (s *ChatSession) getActiveUsers() []user.IUser {
 	s.mu.Lock()
-	user.SetNickname(nickname)
-	s.mu.Unlock()
+	defer s.mu.Unlock()
+
+	var users []user.IUser
+
+	for _, v := range s.clients {
+		users = append(users, v)
+	}
+
+	return users
+}
+
+func parseCommand(text string) (string, string) {
+	text = strings.TrimSpace(strings.ReplaceAll(text, "\r", ""))
+	parts := strings.SplitN(text, " ", 2)
+
+	cmd := parts[0]
+	arg := ""
+	if len(parts) > 1 {
+		arg = strings.TrimSpace(parts[1])
+	}
+
+	return cmd, arg
 }

@@ -9,12 +9,23 @@ type IMessage interface {
 	User() user.IUser
 	Text() string
 	SetText(text string)
+	SystemText() string
+	SetSystemText(text string)
 	Print() string
 }
 
 type Message struct {
-	user user.IUser
-	text string
+	user       user.IUser
+	text       string
+	systemText string
+}
+
+func (m *Message) SystemText() string {
+	return m.systemText
+}
+
+func (m *Message) SetSystemText(systemText string) {
+	m.systemText = systemText
 }
 
 func NewMessage(user user.IUser, text string) *Message {
@@ -34,5 +45,9 @@ func (m *Message) SetText(text string) {
 }
 
 func (m *Message) Print() string {
-	return fmt.Sprintf("[%s]> %s", m.user.Nickname(), m.text)
+	message := fmt.Sprintf("[%s]> %s", m.user.Nickname(), m.text)
+	if m.SystemText() != "" {
+		message += fmt.Sprintf("\n%s", m.SystemText())
+	}
+	return message
 }
