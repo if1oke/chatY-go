@@ -15,23 +15,27 @@ const (
 	COMMAND_NICKNAME = "/nick"
 	COMMAND_LIST     = "/list"
 	COMMAND_EXIT     = "/exit"
+	COMMAND_HELP     = "/help"
 )
 
 type ChatSession struct {
-	broadcast chan message.IMessage
-	clients   map[net.Conn]user.IUser
-	mu        *sync.Mutex
+	systemUser user.IUser
+	broadcast  chan message.IMessage
+	clients    map[net.Conn]user.IUser
+	mu         *sync.Mutex
 }
 
 func NewChatSession(
+	systemUser user.IUser,
 	broadcast chan message.IMessage,
 	clients map[net.Conn]user.IUser,
 	mu *sync.Mutex,
 ) *ChatSession {
 	s := &ChatSession{
-		broadcast: broadcast,
-		clients:   clients,
-		mu:        mu,
+		systemUser: systemUser,
+		broadcast:  broadcast,
+		clients:    clients,
+		mu:         mu,
 	}
 	go s.broadcaster()
 	return s
@@ -62,9 +66,8 @@ func (s *ChatSession) Start(conn net.Conn) {
 		msg := message.NewMessage(s.clients[conn], rawMessage)
 		log.Printf(msg.Print())
 
-		s.handleCommands(msg, conn)
-
 		s.doBroadcast(msg)
+		s.handleCommands(msg, conn)
 	}
 }
 
@@ -85,12 +88,18 @@ func (s *ChatSession) handleCommands(message message.IMessage, conn net.Conn) {
 
 	switch cmd {
 	case COMMAND_NICKNAME:
-		s.handleNicknameCommand(message, arg)
+		s.handleNicknameCommand(message.User(), arg)
 	case COMMAND_LIST:
-		s.handleListCommand(message)
+		s.handleListCommand()
 	case COMMAND_EXIT:
-		s.unregister(conn)
+		s.handleExitCommand(conn)
+	case COMMAND_HELP:
+		s.handleHelpCommand()
 	}
+}
+
+func (s *ChatSession) notify(text string) {
+	s.doBroadcast(message.NewMessage(s.systemUser, text))
 }
 
 func (s *ChatSession) doBroadcast(message message.IMessage) {
@@ -102,6 +111,7 @@ func (s *ChatSession) register(conn net.Conn) {
 	defer s.mu.Unlock()
 
 	s.clients[conn] = user.NewUser(fmt.Sprintf("User_%s", conn.RemoteAddr()))
+	s.notify(fmt.Sprintf("User %s joined the chat\n", s.clients[conn].Nickname()))
 }
 
 func (s *ChatSession) unregister(conn net.Conn) {

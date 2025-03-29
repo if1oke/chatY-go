@@ -1,27 +1,32 @@
 package session
 
 import (
-	"chatY-go/internal/domain/message"
+	"chatY-go/internal/domain/user"
 	"fmt"
+	"net"
 	"strings"
 )
 
-func (s *ChatSession) handleNicknameCommand(message message.IMessage, arg string) {
+const (
+	HELP_MESSAGE = "Available commands:\n/nick <name> - change nickname\n/list - show active users\n/exit - disconnect\n/help - this help message\n"
+)
+
+func (s *ChatSession) handleNicknameCommand(usr user.IUser, arg string) {
 	if arg == "" {
-		message.SetSystemText("Usage: /nick <new_nickname>\n")
+		s.notify("Usage: /nick <new_nickname>\n")
 		return
 	}
 
-	old := message.User().Nickname()
+	old := usr.Nickname()
 
 	s.mu.Lock()
-	message.User().SetNickname(arg)
+	usr.SetNickname(arg)
 	s.mu.Unlock()
 
-	message.SetSystemText(fmt.Sprintf("%s nickname changed to %s\n", old, arg))
+	s.notify(fmt.Sprintf("%s nickname changed to %s\n", old, arg))
 }
 
-func (s *ChatSession) handleListCommand(message message.IMessage) {
+func (s *ChatSession) handleListCommand() {
 	users := s.getActiveUsers()
 	var b strings.Builder
 
@@ -30,5 +35,15 @@ func (s *ChatSession) handleListCommand(message message.IMessage) {
 		b.WriteString(fmt.Sprintf("- %s\n", u.Nickname()))
 	}
 
-	message.SetSystemText(b.String())
+	s.notify(b.String())
+}
+
+func (s *ChatSession) handleExitCommand(conn net.Conn) {
+	s.notify(fmt.Sprintf("User %s left the chat\n", s.clients[conn].Nickname()))
+
+	s.unregister(conn)
+}
+
+func (s *ChatSession) handleHelpCommand() {
+	s.notify(HELP_MESSAGE)
 }

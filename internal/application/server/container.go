@@ -11,6 +11,10 @@ import (
 	"sync"
 )
 
+const (
+	SYS_USER = "System"
+)
+
 type IApplication interface {
 	Init()
 	AppConfig() utils.IConfig
@@ -38,12 +42,12 @@ func (app *Application) AppConfig() utils.IConfig {
 
 func (app *Application) Session() session.ISession {
 	if app.session == nil {
-
-		broadcast := make(chan message.IMessage)
-		clients := make(map[net.Conn]user.IUser)
-		mu := sync.Mutex{}
-
-		chatSession := appSession.NewChatSession(broadcast, clients, &mu)
+		chatSession := appSession.NewChatSession(
+			user.NewUser(SYS_USER),
+			make(chan message.IMessage),
+			make(map[net.Conn]user.IUser),
+			&sync.Mutex{},
+		)
 		app.session = chatSession
 	}
 	return app.session
