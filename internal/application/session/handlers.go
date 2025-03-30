@@ -1,6 +1,7 @@
 package session
 
 import (
+	"chatY-go/internal/domain/message"
 	"chatY-go/internal/domain/user"
 	"fmt"
 	"net"
@@ -10,6 +11,25 @@ import (
 const (
 	HELP_MESSAGE = "Available commands:\n/nick <name> - change nickname\n/list - show active users\n/exit - disconnect\n/help - this help message\n"
 )
+
+func (s *ChatSession) handleMessage(message message.IMessage, conn net.Conn) {
+	cmd, arg := parseCommand(message.Text())
+
+	switch cmd {
+	case CommandNickname:
+		s.handleNicknameCommand(message.User(), arg[0])
+	case CommandList:
+		s.handleListCommand(message.User())
+	case CommandExit:
+		s.handleExitCommand(conn)
+	case CommandHelp:
+		s.handleHelpCommand(message.User())
+	case CommandWhisper:
+		s.handleWhisperCommand(message.User(), arg)
+	default:
+		s.doBroadcast(message)
+	}
+}
 
 func (s *ChatSession) handleNicknameCommand(usr user.IUser, arg string) {
 	if arg == "" {
