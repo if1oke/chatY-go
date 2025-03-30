@@ -6,7 +6,8 @@ import (
 	"chatY-go/internal/domain/message"
 	"chatY-go/internal/domain/session"
 	"chatY-go/internal/domain/user"
-	"chatY-go/pkg/utils"
+	"chatY-go/pkg/config"
+	"chatY-go/pkg/logger"
 	"net"
 	"sync"
 )
@@ -17,27 +18,32 @@ const (
 
 type IApplication interface {
 	Init()
-	AppConfig() utils.IConfig
+	AppConfig() config.IConfig
 	Session() session.ISession
 	ChatServer() tcp.IRunnable
 }
 
 type Application struct {
-	config  utils.IConfig
+	config  config.IConfig
 	server  tcp.IRunnable
 	session session.ISession
+	logger  logger.ILogger
 }
 
-func NewApplication() *Application {
-	return &Application{}
+func NewApplication(logger logger.ILogger) *Application {
+	return &Application{logger: logger}
 }
 
-func (app *Application) AppConfig() utils.IConfig {
+func (app *Application) AppConfig() config.IConfig {
 	if app.config == nil {
-		config := utils.GetConfig()
+		config := config.GetConfig()
 		app.config = config
 	}
 	return app.config
+}
+
+func (app *Application) Logger() logger.ILogger {
+	return app.logger
 }
 
 func (app *Application) Session() session.ISession {
@@ -47,16 +53,21 @@ func (app *Application) Session() session.ISession {
 			make(chan message.IMessage),
 			make(map[net.Conn]user.IUser),
 			&sync.Mutex{},
+			app.Logger(),
 		)
 		app.session = chatSession
+
+		app.logger.Info("[SERVER] Chat Session initialized")
 	}
 	return app.session
 }
 
 func (app *Application) ChatServer() tcp.IRunnable {
 	if app.server == nil {
-		chatServer := tcp.NewServer(app.Session())
+		chatServer := tcp.NewServer(app.Session(), app.Logger())
 		app.server = chatServer
+
+		app.logger.Info("[SERVER] TCP Server initialized")
 	}
 	return app.server
 }

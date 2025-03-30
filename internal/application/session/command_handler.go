@@ -23,6 +23,7 @@ func (s *ChatSession) handleNicknameCommand(usr user.IUser, arg string) {
 	usr.SetNickname(arg)
 	s.mu.Unlock()
 
+	s.logger.Infof("[NICK] %s changed nickname to %s", old, arg)
 	s.notify(fmt.Sprintf("%s nickname changed to %s\n", old, arg))
 }
 
@@ -40,6 +41,7 @@ func (s *ChatSession) handleListCommand(user user.IUser) {
 
 func (s *ChatSession) handleExitCommand(conn net.Conn) {
 	s.notify(fmt.Sprintf("User %s left the chat\n", s.clients[conn].Nickname()))
+	s.logger.Infof("[LEAVE] User %s left the chat", s.clients[conn].Nickname())
 
 	s.unregister(conn)
 }
@@ -51,17 +53,14 @@ func (s *ChatSession) handleHelpCommand(user user.IUser) {
 func (s *ChatSession) handleWhisperCommand(fromUser user.IUser, args []string) {
 	if len(args) < 2 {
 		s.sendMessageToUser(fromUser, "Usage: /whisper <name> <message>\n")
+		s.logger.Warnf("[WHISPER FAIL] wrong command format %s", args)
 		return
 	}
 
 	toUser := s.getUserByNickname(args[0])
 	if toUser == nil {
 		s.sendMessageToUser(fromUser, fmt.Sprintf("user %s not found\n", toUser))
-		return
-	}
-
-	if len(args[1:]) == 0 {
-		s.sendMessageToUser(fromUser, "Message are empty, write something\n")
+		s.logger.Warnf("[WHISPER FAIL] user %s not found", args[0])
 		return
 	}
 
@@ -71,6 +70,15 @@ func (s *ChatSession) handleWhisperCommand(fromUser user.IUser, args []string) {
 	}
 
 	message := strings.Join(args[1:], " ")
+
+	if strings.TrimSpace(message) == "" {
+		s.sendMessageToUser(fromUser, "Message are empty, write something\n")
+		s.logger.Warn("[WHISPER FAIL] message are empty")
+		return
+	}
+
+	s.logger.Infof("[WHISPER] %s -> %s: %s", fromUser.Nickname(), toUser.Nickname(), message)
+
 	s.sendMessageToUser(fromUser, fmt.Sprintf("[%s] -> [%s]> %s", fromUser.Nickname(), toUser.Nickname(), message+"\n"))
 	s.sendMessageToUser(toUser, fmt.Sprintf("[%s] -> [%s]> %s", fromUser.Nickname(), toUser.Nickname(), message+"\n"))
 }

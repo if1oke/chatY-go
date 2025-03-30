@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"chatY-go/internal/domain/message"
 	"chatY-go/internal/domain/user"
+	"chatY-go/pkg/logger"
 	"fmt"
 	"log"
 	"net"
@@ -24,6 +25,7 @@ type ChatSession struct {
 	broadcast  chan message.IMessage
 	clients    map[net.Conn]user.IUser
 	mu         *sync.Mutex
+	logger     logger.ILogger
 }
 
 func NewChatSession(
@@ -31,19 +33,26 @@ func NewChatSession(
 	broadcast chan message.IMessage,
 	clients map[net.Conn]user.IUser,
 	mu *sync.Mutex,
+	logger logger.ILogger,
 ) *ChatSession {
 	s := &ChatSession{
 		systemUser: systemUser,
 		broadcast:  broadcast,
 		clients:    clients,
 		mu:         mu,
+		logger:     logger,
 	}
 	go s.broadcaster()
 	return s
 }
 
 func (s *ChatSession) Start(conn net.Conn) {
+	defer func() {
+		s.logger.Infof("[DISCONNECT] Client %s disconnected", conn.RemoteAddr())
+	}()
+
 	s.register(conn)
+	s.logger.Infof("[JOIN] User %s joined the chat", s.clients[conn].Nickname())
 
 	defer func() {
 		s.unregister(conn)
@@ -59,7 +68,6 @@ func (s *ChatSession) Start(conn net.Conn) {
 		rawMessage, err := reader.ReadString('\n')
 
 		if err != nil {
-			log.Printf("Client disconnected: %v", err)
 			s.unregister(conn)
 			return
 		}
@@ -77,7 +85,7 @@ func (s *ChatSession) broadcaster() {
 		for client := range s.clients {
 			_, err := fmt.Fprintf(client, msg.Print())
 			if err != nil {
-				log.Printf("write to client error: %s", err.Error())
+				s.logger.Errorf("[ERROR] Write to client %s failed: %v", client.RemoteAddr(), err)
 			}
 		}
 	}
@@ -167,7 +175,7 @@ func (s *ChatSession) sendMessageToUser(user user.IUser, text string) {
 	conn := s.getConnByNickname(user.Nickname())
 	_, err := fmt.Fprintf(conn, text)
 	if err != nil {
-		log.Printf("write to client error: %s", err.Error())
+		s.logger.Errorf("[ERROR] Write to client %s failed: %v", conn.RemoteAddr(), err)
 	}
 }
 

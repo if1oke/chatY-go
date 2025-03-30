@@ -2,7 +2,8 @@ package tcp
 
 import (
 	"chatY-go/internal/domain/session"
-	"chatY-go/pkg/utils"
+	"chatY-go/pkg/config"
+	"chatY-go/pkg/logger"
 	"fmt"
 	"net"
 )
@@ -12,30 +13,35 @@ const (
 )
 
 type IRunnable interface {
-	Start(config utils.IConfig) error
+	Start(config config.IConfig) error
 }
 
 type Server struct {
 	session session.ISession
+	logger  logger.ILogger
 }
 
-func NewServer(s session.ISession) *Server {
-	return &Server{session: s}
+func NewServer(s session.ISession, l logger.ILogger) *Server {
+	return &Server{session: s, logger: l}
 }
 
-func (s *Server) Start(config utils.IConfig) error {
+func (s *Server) Start(config config.IConfig) error {
 	listen, err := net.Listen(tcp, fmt.Sprintf("%s:%s", config.ServerAddress(), config.ServerPort()))
 	if err != nil {
+		s.logger.Errorf("[SERVER] Listen error: %v", err)
 		return fmt.Errorf("listen err: %s", err.Error())
 	}
 	defer listen.Close()
 
+	s.logger.Infof("[SERVER] Listening on %s:%s", config.ServerAddress(), config.ServerPort())
+
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			fmt.Printf("accept err: %s", err.Error())
+			s.logger.Warnf("[SERVER] Failed to accept connection: %v", err)
 			continue
 		}
+		s.logger.Infof("[CONNECT] New connection from %s", conn.RemoteAddr())
 
 		go s.session.Start(conn)
 	}
