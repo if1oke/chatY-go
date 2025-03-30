@@ -16,6 +16,7 @@ const (
 	COMMAND_LIST     = "/list"
 	COMMAND_EXIT     = "/exit"
 	COMMAND_HELP     = "/help"
+	COMMAND_WHISPER  = "/whisper"
 )
 
 type ChatSession struct {
@@ -66,8 +67,7 @@ func (s *ChatSession) Start(conn net.Conn) {
 		msg := message.NewMessage(s.clients[conn], rawMessage)
 		log.Printf(msg.Print())
 
-		s.doBroadcast(msg)
-		s.handleCommands(msg, conn)
+		s.handleMessage(msg, conn)
 	}
 }
 
@@ -83,18 +83,22 @@ func (s *ChatSession) broadcaster() {
 	}
 }
 
-func (s *ChatSession) handleCommands(message message.IMessage, conn net.Conn) {
+func (s *ChatSession) handleMessage(message message.IMessage, conn net.Conn) {
 	cmd, arg := parseCommand(message.Text())
 
 	switch cmd {
 	case COMMAND_NICKNAME:
-		s.handleNicknameCommand(message.User(), arg)
+		s.handleNicknameCommand(message.User(), arg[0])
 	case COMMAND_LIST:
-		s.handleListCommand()
+		s.handleListCommand(message.User())
 	case COMMAND_EXIT:
 		s.handleExitCommand(conn)
 	case COMMAND_HELP:
-		s.handleHelpCommand()
+		s.handleHelpCommand(message.User())
+	case COMMAND_WHISPER:
+		s.handleWhisperCommand(message.User(), arg)
+	default:
+		s.doBroadcast(message)
 	}
 }
 
@@ -135,15 +139,49 @@ func (s *ChatSession) getActiveUsers() []user.IUser {
 	return users
 }
 
-func parseCommand(text string) (string, string) {
+func (s *ChatSession) getUserByNickname(nickname string) user.IUser {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, v := range s.clients {
+		if v.Nickname() == nickname {
+			return v
+		}
+	}
+	return nil
+}
+
+func (s *ChatSession) getConnByNickname(nickname string) net.Conn {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for c, v := range s.clients {
+		if v.Nickname() == nickname {
+			return c
+		}
+	}
+	return nil
+}
+
+func (s *ChatSession) sendMessageToUser(user user.IUser, text string) {
+	conn := s.getConnByNickname(user.Nickname())
+	_, err := fmt.Fprintf(conn, text)
+	if err != nil {
+		log.Printf("write to client error: %s", err.Error())
+	}
+}
+
+func parseCommand(text string) (string, []string) {
 	text = strings.TrimSpace(strings.ReplaceAll(text, "\r", ""))
-	parts := strings.SplitN(text, " ", 2)
+	parts := strings.Split(text, " ")
 
 	cmd := parts[0]
-	arg := ""
+	args := parts[1:]
 	if len(parts) > 1 {
-		arg = strings.TrimSpace(parts[1])
+		for i, v := range args {
+			args[i] = strings.TrimSpace(v)
+		}
 	}
 
-	return cmd, arg
+	return cmd, args
 }
