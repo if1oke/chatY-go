@@ -9,11 +9,13 @@ import (
 type IConfig interface {
 	ServerPort() string
 	ServerAddress() string
+	AuthPort() string
 }
 
 type Config struct {
 	serverPort    string
 	serverAddress string
+	authPort      string
 }
 
 func (c Config) ServerPort() string {
@@ -24,6 +26,10 @@ func (c Config) ServerAddress() string {
 	return c.serverAddress
 }
 
+func (c Config) AuthPort() string {
+	return c.authPort
+}
+
 func GetConfig() *Config {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -31,7 +37,8 @@ func GetConfig() *Config {
 	}
 	serverPort := getEnv("SERVER_PORT", "33100")
 	serverAddress := getEnv("SERVER_ADDRESS", "localhost")
-	return &Config{serverPort, serverAddress}
+	authPort := getEnv("AUTH_PORT", "33101")
+	return &Config{serverPort, serverAddress, authPort}
 }
 
 func getEnv(key, fallback string) string {
