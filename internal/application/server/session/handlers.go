@@ -12,7 +12,7 @@ const (
 	HELP_MESSAGE = "Available commands:\n/nick <name> - change nickname\n/list - show active users\n/exit - disconnect\n/help - this help message\n"
 )
 
-func (s *ChatSession) handleMessage(message message.IMessage, conn net.Conn) {
+func (s *ChatServer) handleMessage(message message.IMessage, conn net.Conn) {
 	cmd, arg := parseCommand(message.Text())
 
 	switch cmd {
@@ -31,7 +31,7 @@ func (s *ChatSession) handleMessage(message message.IMessage, conn net.Conn) {
 	}
 }
 
-func (s *ChatSession) handleNicknameCommand(usr user.IUser, arg string) {
+func (s *ChatServer) handleNicknameCommand(usr user.IUser, arg string) {
 	if arg == "" {
 		s.notify("Usage: /nick <new_nickname>\n")
 		return
@@ -47,7 +47,7 @@ func (s *ChatSession) handleNicknameCommand(usr user.IUser, arg string) {
 	s.notify(fmt.Sprintf("%s nickname changed to %s\n", old, arg))
 }
 
-func (s *ChatSession) handleListCommand(user user.IUser) {
+func (s *ChatServer) handleListCommand(user user.IUser) {
 	users := s.getActiveUsers()
 	var b strings.Builder
 
@@ -59,18 +59,18 @@ func (s *ChatSession) handleListCommand(user user.IUser) {
 	s.sendMessageToUser(user, b.String())
 }
 
-func (s *ChatSession) handleExitCommand(conn net.Conn) {
+func (s *ChatServer) handleExitCommand(conn net.Conn) {
 	s.notify(fmt.Sprintf("User %s left the chat\n", s.clients[conn].Nickname()))
 	s.logger.Infof("[LEAVE] User %s left the chat", s.clients[conn].Nickname())
 
 	s.unregister(conn)
 }
 
-func (s *ChatSession) handleHelpCommand(user user.IUser) {
+func (s *ChatServer) handleHelpCommand(user user.IUser) {
 	s.sendMessageToUser(user, HELP_MESSAGE)
 }
 
-func (s *ChatSession) handleWhisperCommand(fromUser user.IUser, args []string) {
+func (s *ChatServer) handleWhisperCommand(fromUser user.IUser, args []string) {
 	if len(args) < 2 {
 		s.sendMessageToUser(fromUser, "Usage: /whisper <name> <message>\n")
 		s.logger.Warnf("[WHISPER FAIL] wrong command format %s", args)

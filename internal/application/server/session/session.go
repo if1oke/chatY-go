@@ -19,7 +19,11 @@ const (
 	CommandWhisper  = "/whisper"
 )
 
-type ChatSession struct {
+type IChatServer interface {
+	Start(conn net.Conn)
+}
+
+type ChatServer struct {
 	systemUser user.IUser
 	broadcast  chan message.IMessage
 	clients    map[net.Conn]user.IUser
@@ -27,14 +31,14 @@ type ChatSession struct {
 	logger     logger.ILogger
 }
 
-func NewChatSession(
+func NewChatServer(
 	systemUser user.IUser,
 	broadcast chan message.IMessage,
 	clients map[net.Conn]user.IUser,
 	mu *sync.Mutex,
 	logger logger.ILogger,
-) *ChatSession {
-	s := &ChatSession{
+) *ChatServer {
+	s := &ChatServer{
 		systemUser: systemUser,
 		broadcast:  broadcast,
 		clients:    clients,
@@ -45,7 +49,7 @@ func NewChatSession(
 	return s
 }
 
-func (s *ChatSession) Start(conn net.Conn) {
+func (s *ChatServer) Start(conn net.Conn) {
 	defer func() {
 		s.logger.Infof("[DISCONNECT] Client %s disconnected", conn.RemoteAddr())
 	}()
@@ -79,7 +83,7 @@ func (s *ChatSession) Start(conn net.Conn) {
 	}
 }
 
-func (s *ChatSession) broadcaster() {
+func (s *ChatServer) broadcaster() {
 	for {
 		msg := <-s.broadcast
 		for client := range s.clients {
@@ -91,7 +95,7 @@ func (s *ChatSession) broadcaster() {
 	}
 }
 
-func (s *ChatSession) register(conn net.Conn) {
+func (s *ChatServer) register(conn net.Conn) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -99,7 +103,7 @@ func (s *ChatSession) register(conn net.Conn) {
 	s.notify(fmt.Sprintf("User %s joined the chat\n", s.clients[conn].Nickname()))
 }
 
-func (s *ChatSession) unregister(conn net.Conn) {
+func (s *ChatServer) unregister(conn net.Conn) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

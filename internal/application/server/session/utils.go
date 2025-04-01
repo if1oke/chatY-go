@@ -23,7 +23,7 @@ func parseCommand(text string) (string, []string) {
 	return cmd, args
 }
 
-func (s *ChatSession) getActiveUsers() []user.IUser {
+func (s *ChatServer) getActiveUsers() []user.IUser {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -36,7 +36,7 @@ func (s *ChatSession) getActiveUsers() []user.IUser {
 	return users
 }
 
-func (s *ChatSession) getUserByNickname(nickname string) user.IUser {
+func (s *ChatServer) getUserByNickname(nickname string) user.IUser {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -48,7 +48,7 @@ func (s *ChatSession) getUserByNickname(nickname string) user.IUser {
 	return nil
 }
 
-func (s *ChatSession) getConnByNickname(nickname string) net.Conn {
+func (s *ChatServer) getConnByNickname(nickname string) net.Conn {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -60,7 +60,7 @@ func (s *ChatSession) getConnByNickname(nickname string) net.Conn {
 	return nil
 }
 
-func (s *ChatSession) sendMessageToUser(user user.IUser, text string) {
+func (s *ChatServer) sendMessageToUser(user user.IUser, text string) {
 	conn := s.getConnByNickname(user.Nickname())
 	_, err := fmt.Fprintf(conn, text)
 	if err != nil {
@@ -68,10 +68,10 @@ func (s *ChatSession) sendMessageToUser(user user.IUser, text string) {
 	}
 }
 
-func (s *ChatSession) notify(text string) {
+func (s *ChatServer) notify(text string) {
 	s.doBroadcast(message.NewMessage(s.systemUser, text))
 }
 
-func (s *ChatSession) doBroadcast(message message.IMessage) {
+func (s *ChatServer) doBroadcast(message message.IMessage) {
 	s.broadcast <- message
 }

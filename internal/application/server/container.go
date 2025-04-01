@@ -2,9 +2,8 @@ package server
 
 import (
 	"chatY-go/internal/api/tcp"
-	appSession "chatY-go/internal/application/session"
+	"chatY-go/internal/application/server/session"
 	"chatY-go/internal/domain/message"
-	"chatY-go/internal/domain/session"
 	"chatY-go/internal/domain/user"
 	"chatY-go/pkg/config"
 	"chatY-go/pkg/logger"
@@ -19,14 +18,14 @@ const (
 type IApplication interface {
 	Init()
 	AppConfig() config.IConfig
-	Session() session.ISession
+	Session() session.IChatServer
 	ChatServer() tcp.IRunnable
 }
 
 type Application struct {
 	config  config.IConfig
 	server  tcp.IRunnable
-	session session.ISession
+	session session.IChatServer
 	logger  logger.ILogger
 }
 
@@ -46,9 +45,9 @@ func (app *Application) Logger() logger.ILogger {
 	return app.logger
 }
 
-func (app *Application) Session() session.ISession {
+func (app *Application) Session() session.IChatServer {
 	if app.session == nil {
-		chatSession := appSession.NewChatSession(
+		chatSession := session.NewChatServer(
 			user.NewUser(SYS_USER),
 			make(chan message.IMessage),
 			make(map[net.Conn]user.IUser),

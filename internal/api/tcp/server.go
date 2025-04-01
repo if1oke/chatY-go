@@ -1,7 +1,7 @@
 package tcp
 
 import (
-	"chatY-go/internal/domain/session"
+	"chatY-go/internal/application/server/session"
 	"chatY-go/pkg/config"
 	"chatY-go/pkg/logger"
 	"fmt"
@@ -17,11 +17,11 @@ type IRunnable interface {
 }
 
 type Server struct {
-	session session.ISession
+	session session.IChatServer
 	logger  logger.ILogger
 }
 
-func NewServer(s session.ISession, l logger.ILogger) *Server {
+func NewServer(s session.IChatServer, l logger.ILogger) *Server {
 	return &Server{session: s, logger: l}
 }
 
