@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"chatY-go/internal/domain/message"
 	"chatY-go/internal/domain/user"
+	"chatY-go/pkg/authclient"
 	"chatY-go/pkg/logger"
 	"fmt"
-	"log"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -29,6 +30,7 @@ type ChatServer struct {
 	clients    map[net.Conn]user.IUser
 	mu         *sync.Mutex
 	logger     logger.ILogger
+	authClient authclient.IAuthClient
 }
 
 func NewChatServer(
@@ -37,6 +39,7 @@ func NewChatServer(
 	clients map[net.Conn]user.IUser,
 	mu *sync.Mutex,
 	logger logger.ILogger,
+	authClient authclient.IAuthClient,
 ) *ChatServer {
 	s := &ChatServer{
 		systemUser: systemUser,
@@ -44,9 +47,23 @@ func NewChatServer(
 		clients:    clients,
 		mu:         mu,
 		logger:     logger,
+		authClient: authClient,
 	}
 	go s.broadcaster()
 	return s
+}
+
+func (s *ChatServer) AskUser(msg string, conn net.Conn) (string, error) {
+	reader := bufio.NewReader(conn)
+	_, err := fmt.Fprintf(conn, msg)
+	if err != nil {
+		s.logger.Errorf("[DISCONNECT] Error ask %s: %v", msg, err)
+		return "", fmt.Errorf("[DISCONNECT] Error ask %s: %v", msg, err)
+	}
+
+	prepVal, _ := reader.ReadString('\n')
+	fmt.Fprint(conn, "\n")
+	return strings.TrimSpace(prepVal), nil
 }
 
 func (s *ChatServer) Start(conn net.Conn) {
@@ -54,8 +71,27 @@ func (s *ChatServer) Start(conn net.Conn) {
 		s.logger.Infof("[DISCONNECT] Client %s disconnected", conn.RemoteAddr())
 	}()
 
-	s.register(conn)
-	s.logger.Infof("[JOIN] User %s joined the chat", s.clients[conn].Nickname())
+	// Ask credentials
+	login, err := s.AskUser("Input username:", conn)
+	if err != nil {
+		s.logger.Errorf("[DISCONNECT] Error ask login: %v", err)
+	}
+
+	password, err := s.AskUser("Input password:", conn)
+	if err != nil {
+		s.logger.Errorf("[DISCONNECT] Error ask password: %v", err)
+	}
+
+	ok, msg, err := s.authClient.Login(login, password)
+	if err != nil || !ok {
+		s.logger.Errorf("[DISCONNECT] Error login: %s, %v", msg, err)
+		conn.Close()
+		return
+	}
+	s.logger.Infof("[AUTH] Пользователь %s успешно авторизован", login)
+
+	s.register(conn, login)
+	s.logger.Infof("[JOIN] %s joined the chat", s.clients[conn].Nickname())
 
 	defer func() {
 		s.unregister(conn)
@@ -76,7 +112,6 @@ func (s *ChatServer) Start(conn net.Conn) {
 		}
 
 		msg := message.NewMessage(s.clients[conn], rawMessage)
-		log.Printf(msg.Print())
 		s.logger.Infof("[MESSAGE] %s", msg.Print())
 
 		s.handleMessage(msg, conn)
@@ -95,11 +130,11 @@ func (s *ChatServer) broadcaster() {
 	}
 }
 
-func (s *ChatServer) register(conn net.Conn) {
+func (s *ChatServer) register(conn net.Conn, login string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.clients[conn] = user.NewUser(fmt.Sprintf("User_%s", conn.RemoteAddr()))
+	s.clients[conn] = user.NewUser(login)
 	s.notify(fmt.Sprintf("User %s joined the chat\n", s.clients[conn].Nickname()))
 }
 

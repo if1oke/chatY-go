@@ -6,6 +6,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+type IAuthClient interface {
+	Login(username string, password string) (bool, string, error)
+}
+
 type AuthClient struct {
 	client proto.AuthServiceClient
 }
