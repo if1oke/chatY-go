@@ -30,7 +30,7 @@ func NewApplication(l logger.ILogger) *Application {
 
 func (a *Application) Config() config.IConfig {
 	if a.config == nil {
-		a.config = config.GetConfig()
+		a.config = config.NewConfig()
 	}
 	return a.config
 }

@@ -30,7 +30,7 @@ func (c Config) AuthPort() string {
 	return c.authPort
 }
 
-func GetConfig() *Config {
+func NewConfig() *Config {
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Println("Error loading .env file")

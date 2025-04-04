@@ -41,7 +41,7 @@ func NewApplication(logger logger.ILogger) *Application {
 
 func (app *Application) AppConfig() config.IConfig {
 	if app.config == nil {
-		config := config.GetConfig()
+		config := config.NewConfig()
 		app.config = config
 	}
 	return app.config

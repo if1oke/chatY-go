@@ -68,6 +68,13 @@ func (s *ChatServer) sendMessageToUser(user user.IUser, text string) {
 	}
 }
 
+func (s *ChatServer) sendMessageToConn(conn net.Conn, text string) {
+	_, err := fmt.Fprintf(conn, text)
+	if err != nil {
+		s.logger.Errorf("[ERROR] Write to client %s failed: %v", conn.RemoteAddr(), err)
+	}
+}
+
 func (s *ChatServer) notify(text string) {
 	s.doBroadcast(message.NewMessage(s.systemUser, text))
 }

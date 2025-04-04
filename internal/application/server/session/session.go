@@ -18,6 +18,7 @@ const (
 	CommandExit     = "/exit"
 	CommandHelp     = "/help"
 	CommandWhisper  = "/whisper"
+	CommandAuth     = "/auth"
 )
 
 type IChatServer interface {
@@ -69,51 +70,52 @@ func (s *ChatServer) AskUser(msg string, conn net.Conn) (string, error) {
 func (s *ChatServer) Start(conn net.Conn) {
 	defer func() {
 		s.logger.Infof("[DISCONNECT] Client %s disconnected", conn.RemoteAddr())
-	}()
-
-	// Ask credentials
-	login, err := s.AskUser("Input username:", conn)
-	if err != nil {
-		s.logger.Errorf("[DISCONNECT] Error ask login: %v", err)
-	}
-
-	password, err := s.AskUser("Input password:", conn)
-	if err != nil {
-		s.logger.Errorf("[DISCONNECT] Error ask password: %v", err)
-	}
-
-	ok, msg, err := s.authClient.Login(login, password)
-	if err != nil || !ok {
-		s.logger.Errorf("[DISCONNECT] Error login: %s, %v", msg, err)
-		conn.Close()
-		return
-	}
-	s.logger.Infof("[AUTH] Пользователь %s успешно авторизован", login)
-
-	s.register(conn, login)
-	s.logger.Infof("[JOIN] %s joined the chat", s.clients[conn].Nickname())
-
-	defer func() {
 		s.unregister(conn)
-		err := conn.Close()
-		if err != nil {
-			return
-		}
+		conn.Close()
 	}()
 
 	reader := bufio.NewReader(conn)
 
-	for {
-		rawMessage, err := reader.ReadString('\n')
+	var username, password string
+	isAuthorized := false
 
+	for {
+		raw, err := reader.ReadString('\n')
+		fmt.Println(raw)
 		if err != nil {
-			s.unregister(conn)
+			s.logger.Errorf("[ERROR] Error reading from %s: %v", conn.RemoteAddr(), err)
 			return
 		}
+		cmd, args := parseCommand(raw)
+		if !isAuthorized {
+			if cmd != CommandAuth {
+				s.sendMessageToConn(conn, "[ERROR] Please authorize using /auth <username> <password>\n")
+				continue
+			}
 
-		msg := message.NewMessage(s.clients[conn], rawMessage)
+			if len(args) != 2 {
+				s.sendMessageToConn(conn, "[ERROR] You must provide username and password\n")
+			}
+
+			username = args[0]
+			password = args[1]
+
+			ok, msg, err := s.authClient.Login(username, password)
+			if err != nil || !ok {
+				s.sendMessageToConn(conn, fmt.Sprintf("[AUTH] Failed to login: %v\n", msg))
+			}
+
+			s.register(conn, username)
+			isAuthorized = true
+
+			s.sendMessageToConn(conn, fmt.Sprintf("[AUTH] Successfully logged in: %v\n", username))
+			s.logger.Infof("[JOIN] User %s joined the chat", username)
+
+			continue
+		}
+
+		msg := message.NewMessage(s.clients[conn], raw)
 		s.logger.Infof("[MESSAGE] %s", msg.Print())
-
 		s.handleMessage(msg, conn)
 	}
 }
