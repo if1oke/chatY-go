@@ -81,7 +81,6 @@ func (s *ChatServer) Start(conn net.Conn) {
 
 	for {
 		raw, err := reader.ReadString('\n')
-		fmt.Println(raw)
 		if err != nil {
 			s.logger.Errorf("[ERROR] Error reading from %s: %v", conn.RemoteAddr(), err)
 			return
@@ -126,7 +125,7 @@ func (s *ChatServer) broadcaster() {
 		for client := range s.clients {
 			_, err := fmt.Fprintf(client, msg.Print())
 			if err != nil {
-				s.logger.Errorf("[ERROR] Write to client %s failed: %v", client.RemoteAddr(), err)
+				s.logger.Errorf("[ERROR] Write to client_old %s failed: %v", client.RemoteAddr(), err)
 			}
 		}
 	}

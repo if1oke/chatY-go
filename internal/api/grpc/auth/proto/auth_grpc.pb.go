@@ -22,7 +22,7 @@ const (
 	AuthService_Login_FullMethodName = "/auth.AuthService/Login"
 )
 
-// AuthServiceClient is the client API for AuthService service.
+// AuthServiceClient is the client_old API for AuthService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AuthServiceClient interface {

@@ -64,14 +64,14 @@ func (s *ChatServer) sendMessageToUser(user user.IUser, text string) {
 	conn := s.getConnByNickname(user.Nickname())
 	_, err := fmt.Fprintf(conn, text)
 	if err != nil {
-		s.logger.Errorf("[ERROR] Write to client %s failed: %v", conn.RemoteAddr(), err)
+		s.logger.Errorf("[ERROR] Write to client_old %s failed: %v", conn.RemoteAddr(), err)
 	}
 }
 
 func (s *ChatServer) sendMessageToConn(conn net.Conn, text string) {
 	_, err := fmt.Fprintf(conn, text)
 	if err != nil {
-		s.logger.Errorf("[ERROR] Write to client %s failed: %v", conn.RemoteAddr(), err)
+		s.logger.Errorf("[ERROR] Write to client_old %s failed: %v", conn.RemoteAddr(), err)
 	}
 }
 
